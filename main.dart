@@ -10,7 +10,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: MapScreen(),
-      print("hayat");
     );
   }
 }
@@ -31,18 +30,40 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text('Firebase Harita Uygulaması'),
       ),
-      body: GoogleMap(
-        onMapCreated: (controller) {
-          setState(() {
-            _controller = controller;
-          });
-        },
-        polygons: _polygons,
-        initialCameraPosition: CameraPosition(
-          target: LatLng(37.7749, -122.4194), // Başlangıç konumu (örnek olarak San Francisco)
-          zoom: 12.0,
-        ),
-        onTap: _onMapTapped,
+      body: Column(
+        children: [
+          DropdownButton<String>(
+            value: _selectedDamageStatus,
+            onChanged: (String newValue) {
+              setState(() {
+                _selectedDamageStatus = newValue;
+                _updatePolygonsColor();
+              });
+            },
+            items: ['Ağır Hasarlı', 'Orta Hasarlı', 'Hafif Hasarlı']
+                .map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+          ),
+          Expanded(
+            child: GoogleMap(
+              onMapCreated: (controller) {
+                setState(() {
+                  _controller = controller;
+                });
+              },
+              polygons: _polygons,
+              initialCameraPosition: CameraPosition(
+                target: LatLng(37.7749, -122.4194),
+                zoom: 12.0,
+              ),
+              onTap: _onMapTapped,
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _saveToFirebase,
@@ -56,9 +77,7 @@ class _MapScreenState extends State<MapScreen> {
       _polygons.add(Polygon(
         polygonId: PolygonId('building'),
         points: _createPolygonPoints(point),
-        fillColor: _selectedDamageStatus == 'Ağır Hasarlı'
-            ? Colors.red.withOpacity(0.5)
-            : Colors.green.withOpacity(0.5),
+        fillColor: _getFillColor(),
         strokeWidth: 2,
         strokeColor: Colors.black,
       ));
@@ -66,7 +85,6 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   List<LatLng> _createPolygonPoints(LatLng center) {
-    // Poligon noktalarını oluşturun (örneğin, dikdörtgen)
     double offset = 0.001;
     return [
       LatLng(center.latitude + offset, center.longitude - offset),
@@ -76,9 +94,28 @@ class _MapScreenState extends State<MapScreen> {
     ];
   }
 
-  import 'package:cloud_firestore/cloud_firestore.dart';
+  Color _getFillColor() {
+    switch (_selectedDamageStatus) {
+      case 'Ağır Hasarlı':
+        return Colors.red.withOpacity(0.5);
+      case 'Orta Hasarlı':
+        return Colors.orange.withOpacity(0.5);
+      case 'Hafif Hasarlı':
+        return Colors.green.withOpacity(0.5);
+      default:
+        return Colors.transparent;
+    }
+  }
 
-void _saveToFirebase() async {
+  void _updatePolygonsColor() {
+    setState(() {
+      _polygons = _polygons.map((polygon) {
+        return polygon.copyWith(fillColorParam: _getFillColor());
+      }).toSet();
+    });
+  }
+
+  void _saveToFirebase() async {
   // Firestore bağlantısını başlatın
   FirebaseFirestore firestore = FirebaseFirestore.instance;
 
@@ -105,5 +142,6 @@ void _saveToFirebase() async {
   // Firestore bağlantısını kapatın (isteğe bağlı)
   // firestore.terminate();
 }
+
 
 }
